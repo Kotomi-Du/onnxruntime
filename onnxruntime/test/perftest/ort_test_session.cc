@@ -1054,6 +1054,28 @@ static void FillTensorDataTyped(Ort::Value& tensor, size_t count, int32_t seed =
   if (!random_init) {
     std::fill_n(data, count, value);
   }
+
+  // Dump data into a txt file
+  std::ofstream txt_file("tensor_data.txt");
+  if (!txt_file.is_open()) {
+    ORT_THROW("Failed to open file 'tensor_data.txt' for writing.");
+  }
+
+ for (size_t i = 0; i < count; ++i) {
+   if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value) {
+     txt_file << std::fixed << data[i] << "\n";
+   } else if constexpr (std::is_same<T, bool>::value) {
+     txt_file << (data[i] ? "true" : "false") << "\n";
+   } else if constexpr (std::is_integral<T>::value) {
+     txt_file << static_cast<int64_t>(data[i]) << "\n";
+   } else {
+     fprintf(stdout ,"Unsupported data type");
+   }
+ }
+
+  txt_file.close();
+  fprintf(stdout, "Tensor data dumped to tensor_data.txt\n");
+
 }
 
 // seed=-1 means we keep the initialized it with a constant value "T{}"
