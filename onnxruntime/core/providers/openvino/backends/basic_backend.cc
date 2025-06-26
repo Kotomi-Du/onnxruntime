@@ -37,6 +37,9 @@ BasicBackend::BasicBackend(std::unique_ptr<ONNX_NAMESPACE::ModelProto>& model_pr
     : session_context_{session_context}, subgraph_context_{subgraph_context}, shared_context_{shared_context} {
   std::string& hw_target = session_context_.device_type;
   bool enable_causallm = session_context_.enable_causallm;
+  std::string file_name = subgraph_context.subgraph_name + "_static.onnx";
+  std::fstream outfile(file_name, std::ios::out | std::ios::trunc | std::ios::binary);
+  model_proto->SerializeToOstream(outfile);
 
   std::string file_name = subgraph_context.subgraph_name + "_toOV.onnx";
   std::fstream outfile(file_name, std::ios::out | std::ios::trunc | std::ios::binary);
