@@ -38,6 +38,10 @@ BasicBackend::BasicBackend(std::unique_ptr<ONNX_NAMESPACE::ModelProto>& model_pr
   std::string& hw_target = session_context_.device_type;
   bool enable_causallm = session_context_.enable_causallm;
 
+  std::string file_name = subgraph_context.subgraph_name + "_toOV.onnx";
+  std::fstream outfile(file_name, std::ios::out | std::ios::trunc | std::ios::binary);
+  model_proto->SerializeToOstream(outfile);
+
   if (ValidateSubgraph(const_outputs_map_))
     return;
 
@@ -141,6 +145,9 @@ BasicBackend::BasicBackend(std::unique_ptr<ONNX_NAMESPACE::ModelProto>& model_pr
       }
     }
   }
+
+  ov::serialize(exe_network_.Get().get_runtime_model(), subgraph_context.subgraph_name + "_executed.xml");
+
   int num_infer_req = (session_context_.num_of_threads > 0) ? session_context_.num_of_threads : 1;
   std::function<void(OVInferRequestPtr)> initializer = [](OVInferRequestPtr) {};
   auto metadata = shared_context_.shared_weights.metadata;
