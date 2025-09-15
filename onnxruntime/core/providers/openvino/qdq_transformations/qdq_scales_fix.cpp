@@ -777,11 +777,11 @@ bool scale_graph(CustomGraph& gen_graph,
 Status copy_model(const GraphViewer& src_graph_viewer,
                   const logging::Logger& logger, std::unique_ptr<onnxruntime::Model>& model) {
   model = src_graph_viewer.CreateModel(logger);
-  const auto& src_graph = src_graph_viewer.GetGraph();
+  //const auto& src_graph = src_graph_viewer.GetGraph();
   auto& dst_graph = model->MainGraph();
 
-  const auto& inputs = src_graph.GetInputs();
-  const auto& outputs = src_graph.GetOutputs();
+  const auto& inputs = src_graph_viewer.GetInputs();
+  const auto& outputs = src_graph_viewer.GetOutputs();
 
   struct InputReplacement {
     NodeArg* graph_input;
@@ -799,7 +799,7 @@ Status copy_model(const GraphViewer& src_graph_viewer,
   dst_graph_inputs.reserve(inputs.size());
   for (auto& input : inputs) {
     const auto& input_name = input->Name();
-    auto input_arg = src_graph.GetNodeArg(input_name);
+    auto input_arg = src_graph_viewer.GetNodeArg(input_name);
 
     auto& dst_input_arg = dst_graph.GetOrCreateNodeArg(input_name, input_arg->TypeAsProto());
     dst_graph_inputs.push_back(&dst_input_arg);
@@ -813,7 +813,7 @@ Status copy_model(const GraphViewer& src_graph_viewer,
   InlinedVector<const NodeArg*> dst_graph_outputs;
   for (auto& output : outputs) {
     const auto& output_name = output->Name();
-    auto output_arg = src_graph.GetNodeArg(output_name);
+    auto output_arg = src_graph_viewer.GetNodeArg(output_name);
 
     std::string intermediate_name = "tmp_" + output_name;
     auto& intermediate_out = dst_graph.GetOrCreateNodeArg(intermediate_name, output_arg->TypeAsProto());
@@ -826,10 +826,10 @@ Status copy_model(const GraphViewer& src_graph_viewer,
 
   dst_graph.SetInputs(dst_graph_inputs);
   dst_graph.SetOutputs(dst_graph_outputs);
-  dst_graph.SetName(src_graph.Name());
+  dst_graph.SetName(src_graph_viewer.Name());
 
   for (const auto& name : src_graph_viewer.GetOuterScopeNodeArgNames()) {
-    auto node_arg = src_graph.GetNodeArg(name);
+    auto node_arg = src_graph_viewer.GetNodeArg(name);
     ORT_RETURN_IF_NOT(node_arg != nullptr, "Outer scope node arg name '" + name + "'was added but does not exist. ");
     dst_graph.AddOuterScopeNodeArg(name);
   }
@@ -848,12 +848,12 @@ Status copy_model(const GraphViewer& src_graph_viewer,
                       input_args, output_args,
                       nullptr, "");
   }
-
-  for (auto pnode : src_graph.Nodes()) {
-    if (pnode->NodeType() == Node::Type::Fused) continue;
+  src_graph_viewer.Nodes();
+  for (const auto& pnode : src_graph_viewer.Nodes()) {
+    if (pnode.NodeType() == Node::Type::Fused) continue;
 
     InlinedVector<NodeArg*> new_input_args;
-    for (auto input_arg : pnode->InputDefs()) {
+    for (auto input_arg : pnode.InputDefs()) {
       if (!input_arg) {
         new_input_args.push_back(nullptr);
         continue;
@@ -868,7 +868,7 @@ Status copy_model(const GraphViewer& src_graph_viewer,
       }
     }
     InlinedVector<NodeArg*> new_output_args;
-    for (auto output_arg : pnode->OutputDefs()) {
+    for (auto output_arg : pnode.OutputDefs()) {
       if (output_arg == nullptr) {
         new_output_args.push_back(nullptr);
         continue;
@@ -883,9 +883,9 @@ Status copy_model(const GraphViewer& src_graph_viewer,
       }
     }
 
-    dst_graph.AddNode(pnode->Name(), pnode->OpType(), pnode->Description(),
+    dst_graph.AddNode(pnode.Name(), pnode.OpType(), pnode.Description(),
                       new_input_args, new_output_args,
-                      &pnode->GetAttributes(), pnode->Domain());
+                      &pnode.GetAttributes(), pnode.Domain());
   }
 
   for (auto& output : outputs) {
@@ -902,24 +902,24 @@ Status copy_model(const GraphViewer& src_graph_viewer,
                       input_args, output_args, nullptr, "");
   }
 
-  for (auto& [name, tensor_proto] : src_graph.GetAllInitializedTensors()) {
+  for (auto& [name, tensor_proto] : src_graph_viewer.GetAllInitializedTensors()) {
     dst_graph.AddInitializedTensor(*tensor_proto);
   }
 
-  for (auto node_arg : src_graph.GetInputsIncludingInitializers()) {
+  /*for (auto node_arg : src_graph_viewer.GetInputsIncludingInitializers()) {
     auto check_inputs = [node_arg](auto input_node_arg) {
       return input_node_arg->Name() == node_arg->Name();
     };
     if (std::find_if(dst_graph_inputs.begin(), dst_graph_inputs.end(), check_inputs) != dst_graph_inputs.end())
       continue;
 
-    auto src_tensor_proto = src_graph.GetConstantInitializer(node_arg->Name(), true);
+    auto src_tensor_proto = src_graph_viewer.GetConstantInitializer(node_arg->Name(), true);
     if (src_tensor_proto) {
       auto dst_tensor_proto = onnx::TensorProto::Create();
       dst_tensor_proto->copy_from(src_tensor_proto);
       dst_graph.AddInitializedTensor(*dst_tensor_proto);
     }
-  }
+  }*/
 
   ORT_RETURN_IF_ERROR(dst_graph.Resolve());
   return Status::OK();

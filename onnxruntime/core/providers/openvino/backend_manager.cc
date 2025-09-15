@@ -386,7 +386,7 @@ static void DumpOpenVINOEPModel([[maybe_unused]] const std::filesystem::path& on
       model_name.replace_filename(new_name);
       model_name.replace_extension(".onnx");
     }
-
+    std::cout << model_name << std::endl;
     std::fstream dump(model_name, std::ios::out | std::ios::trunc | std::ios::binary);
     model_proto->SerializeToOstream(dump);
   }
@@ -432,7 +432,9 @@ BackendManager::GetModelProtoFromFusedNode(const onnxruntime::Node& fused_node,
 
   const auto& onnx_model_path_name = subgraph.ModelPath();
   // QDQ stripping enabled only for the NPU and experimentally on the GPU
-  if ((session_context_.device_type.find("NPU") != std::string::npos) &&
+  if ((session_context_.device_type.find("NPU") != std::string::npos) 
+      //|| (session_context_.device_type.find("GPU") != std::string::npos) 
+      &&
       (enable_ovep_qdq_optimizer || session_context_.so_share_ep_contexts)) {
     std::unique_ptr<onnxruntime::Model> model;
     Status status = CreateModelWithStrippedQDQNodes(subgraph, logger, session_context_.so_share_ep_contexts, enable_ovep_qdq_optimizer, model, shared_context_.shared_weights);
