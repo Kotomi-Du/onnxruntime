@@ -511,26 +511,27 @@ void StatefulOVInferRequest::RewindKVCache(size_t index) {
       // https://github.com/openvinotoolkit/openvino.genai/blob/releases/2025/1/src/cpp/src/utils.cpp#L329
       auto states = ovInfReq.query_state();
       for (auto& state : states) {
-        ov::Tensor old_tensor = state.get_state();
-        // Tensor shape: [batch_size, num_kv_heads, seq_len, head_size]
-        auto shape = old_tensor.get_shape();
+        state.slice_axis(2, 0, index);
+        //ov::Tensor old_tensor = state.get_state();
+        //// Tensor shape: [batch_size, num_kv_heads, seq_len, head_size]
+        //auto shape = old_tensor.get_shape();
 
-        if (shape[2] > index) {
-          // Update the sequence length dimension to the specified index.
-          shape[2] = index;
+        //if (shape[2] > index) {
+        //  // Update the sequence length dimension to the specified index.
+        //  shape[2] = index;
 
-          ov::Coordinate new_shape_begin{0, 0, 0, 0};
-          ov::Coordinate new_shape_end{shape};
+        //  ov::Coordinate new_shape_begin{0, 0, 0, 0};
+        //  ov::Coordinate new_shape_end{shape};
 
-          // Create a trimmed tensor with the updated shape.
-          auto trimmed_tensor = ov::Tensor(old_tensor, new_shape_begin, new_shape_end);
+        //  // Create a trimmed tensor with the updated shape.
+        //  auto trimmed_tensor = ov::Tensor(old_tensor, new_shape_begin, new_shape_end);
 
-          // Copy the trimmed tensor into a new tensor and update the state.
-          ov::Tensor new_tensor(old_tensor.get_element_type(), shape);
-          trimmed_tensor.copy_to(new_tensor);
+        //  // Copy the trimmed tensor into a new tensor and update the state.
+        //  ov::Tensor new_tensor(old_tensor.get_element_type(), shape);
+        //  trimmed_tensor.copy_to(new_tensor);
 
-          state.set_state(new_tensor);
-        }
+        //  state.set_state(new_tensor);
+        //}
       }
     }
   }
