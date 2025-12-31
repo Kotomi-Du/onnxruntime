@@ -10,6 +10,7 @@
 #include <fstream>
 #include <utility>
 #include <iostream>
+#include <ctime>
 
 #include "core/providers/shared_library/provider_api.h"
 #include "core/providers/openvino/backend_utils.h"
@@ -23,6 +24,11 @@ namespace onnxruntime {
 namespace openvino_ep {
 
 using namespace backend_utils;
+
+static bool CheckDoProfiling() {
+  static const bool doProfiling = GetEnvironmentVar("profiling") == "true";
+  return doProfiling;
+}
 
 BasicBackend::BasicBackend(std::unique_ptr<ONNX_NAMESPACE::ModelProto>& model_proto,
                            SessionContext& session_context,
@@ -182,7 +188,9 @@ void BasicBackend::PopulateConfigValue(ov::AnyMap& device_config) {
     device_config.emplace(ov::enable_profiling(true));
   }
 #endif
-
+ if (CheckDoProfiling()) {
+  device_config.emplace(ov::enable_profiling(true));
+ }
   // Set a priority level for the current workload for preemption;  default priority is "DEFAULT"
   // CPU Plugin doesn't support workload priority
   if (session_context_.device_type.find("CPU") == std::string::npos)
@@ -334,6 +342,48 @@ void BasicBackend::RewindKVCache(size_t index) {
   });
 }
 
+struct ProfilingLogger {
+  std::string csvname;
+  std::ofstream fs;
+  ProfilingLogger() {
+    char timestr[128] = {0};
+    const auto now = std::chrono::system_clock::now();
+    const auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm time{};
+#ifdef _WIN32
+    localtime_s(&time, &t);
+#else
+    localtime_r(&t, &time);
+#endif
+    strftime(timestr, sizeof(timestr), "%y%m%d-%H%M-", &time);
+    csvname = timestr + std::to_string(now.time_since_epoch().count()) + ".profiling.csv";
+    fs.open(csvname, std::ios_base::out | std::ios_base::trunc);
+    fs << "name, status, type, realTime, cpuTime, exec\n";
+  }
+  void Log(const OVInferRequestPtr& infer_request_) {
+    auto performanceMap = infer_request_->GetInfReq().get_profiling_info();
+    for (const auto& it : performanceMap) {
+      fs << std::quoted(it.node_name) << ",";
+      switch (it.status) {
+        case OVProfilingInfo::Status::EXECUTED:
+          fs << "EXECUTED";
+          break;
+        case OVProfilingInfo::Status::NOT_RUN:
+          fs << "NOT_RUN";
+          break;
+        case OVProfilingInfo::Status::OPTIMIZED_OUT:
+          fs << "OPTIMIZED_OUT";
+          break;
+      }
+      fs << "," << it.node_type << "," << it.real_time.count() << "," << it.cpu_time.count() << "," << it.exec_type << "\n";
+      fs.flush();
+    }
+  }
+  ~ProfilingLogger() {
+    printf("@@write profiling to [%s]\n", csvname.c_str());
+  }
+};
+
 void BasicBackend::Infer(OrtKernelContext* ctx) const {
   Ort::KernelContext context(ctx);
 
@@ -436,6 +486,11 @@ void BasicBackend::Infer(OrtKernelContext* ctx) const {
   LOGS_DEFAULT(INFO) << log_tag << "Inference successful";
   if (IsCILogEnabled()) {
     std::cout << "Inference successful" << std::endl;
+  }
+
+  if (CheckDoProfiling()) {
+    static ProfilingLogger logger;
+    logger.Log(infer_request);
   }
 
 #ifndef NDEBUG
