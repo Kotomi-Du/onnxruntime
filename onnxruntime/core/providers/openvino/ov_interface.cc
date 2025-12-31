@@ -485,6 +485,87 @@ void StatefulOVInferRequest::ReorderKVCache(const std::vector<size_t>& src_indic
   }
 }
 
+void PrintTensorValues(const ov::Tensor& tensor, const std::string& state_name, int iteration) {
+  // Create filename with iteration number
+  std::ostringstream filename;
+  filename << "tensor_dump_iter_" << iteration << "_" << state_name << ".txt";
+
+  std::ofstream outfile(filename.str(), std::ios::out);
+  if (!outfile.is_open()) {
+    LOGS_DEFAULT(ERROR) << log_tag << "Failed to open file: " << filename.str();
+    return;
+  }
+
+  auto shape = tensor.get_shape();
+
+  // Write header information
+  outfile << "=== Tensor Dump - Iteration " << iteration << " ===" << std::endl;
+  outfile << "State name: " << state_name << std::endl;
+  outfile << "Shape: [";
+  for (size_t i = 0; i < shape.size(); ++i) {
+    outfile << shape[i];
+    if (i < shape.size() - 1) outfile << ", ";
+  }
+  outfile << "]" << std::endl;
+  outfile << "Element type: " << tensor.get_element_type() << std::endl;
+  outfile << "Total elements: " << tensor.get_size() << std::endl;
+  outfile << std::endl;
+
+  // Dump all values based on element type
+  if (tensor.get_element_type() == ov::element::f32) {
+    const float* data = tensor.data<const float>();
+    outfile << "Values (float):" << std::endl;
+    outfile << std::fixed << std::setprecision(6);
+    for (size_t i = 0; i < tensor.get_size(); ++i) {
+      outfile << data[i];
+      if ((i + 1) % 10 == 0) {
+        outfile << std::endl;  // New line every 10 values
+      } else if (i < tensor.get_size() - 1) {
+        outfile << ", ";
+      }
+    }
+  } else if (tensor.get_element_type() == ov::element::i64) {
+    const int64_t* data = tensor.data<const int64_t>();
+    outfile << "Values (int64):" << std::endl;
+    for (size_t i = 0; i < tensor.get_size(); ++i) {
+      outfile << data[i];
+      if ((i + 1) % 10 == 0) {
+        outfile << std::endl;
+      } else if (i < tensor.get_size() - 1) {
+        outfile << ", ";
+      }
+    }
+  } else if (tensor.get_element_type() == ov::element::i32) {
+    const int32_t* data = tensor.data<const int32_t>();
+    outfile << "Values (int32):" << std::endl;
+    for (size_t i = 0; i < tensor.get_size(); ++i) {
+      outfile << data[i];
+      if ((i + 1) % 10 == 0) {
+        outfile << std::endl;
+      } else if (i < tensor.get_size() - 1) {
+        outfile << ", ";
+      }
+    }
+  } else if (tensor.get_element_type() == ov::element::f16) {
+    // Handle half precision floats
+    const ov::float16* data = tensor.data<const ov::float16>();
+    outfile << "Values (float16):" << std::endl;
+    outfile << std::fixed << std::setprecision(6);
+    for (size_t i = 0; i < tensor.get_size(); ++i) {
+      outfile << static_cast<float>(data[i]);
+      if ((i + 1) % 10 == 0) {
+        outfile << std::endl;
+      } else if (i < tensor.get_size() - 1) {
+        outfile << ", ";
+      }
+    }
+  }
+
+  outfile << std::endl;
+  outfile.close();
+
+  LOGS_DEFAULT(INFO) << log_tag << "Tensor values dumped to: " << filename.str();
+}
 
 void StatefulOVInferRequest::RewindKVCache(size_t index) {
   LOGS_DEFAULT(INFO) << log_tag << "RewindKVCache: Rewinding OpenVINO-internal KVCache state to index=" << index;
