@@ -3,6 +3,9 @@
 // SPDX-FileCopyrightText: Copyright 2024-2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
 // Licensed under the MIT License.
 
+#include "pb_helper.h"
+#include "tensorprotoutils.h"
+
 #include "ort_test_session.h"
 #include <algorithm>
 #include <limits>
@@ -36,6 +39,100 @@ extern const OrtApi* g_ort;
 
 namespace onnxruntime {
 namespace perftest {
+
+// Dump output values to .pb file
+void OnnxRuntimeTestSession::RunDumpToNumpy(std::string output_file) {
+  // Randomly pick one OrtValueArray from test_inputs_ or select provided inputs
+  const std::uniform_int_distribution<int>::param_type p(0, static_cast<int>(test_inputs_.size() - 1));
+  const size_t id = static_cast<size_t>(dist_(rand_engine_, p));
+  auto& input = test_inputs_.at(id);
+  auto output_values = session_.Run(Ort::RunOptions{nullptr}, input_names_.data(), input.data(), input_names_.size(),
+                                    output_names_raw_ptr.data(), output_names_raw_ptr.size());
+
+  ONNX_NAMESPACE::TensorProto test_pb;
+  auto output_tensor = &output_values[0];
+  auto type_info = output_tensor->GetTensorTypeAndShapeInfo();
+  auto shape = type_info.GetShape();
+  for (int i = 0; i < shape.size(); i++)
+    test_pb.add_dims(shape[i]);
+
+  auto element_type = type_info.GetElementType();
+  test_pb.set_data_type(element_type);
+
+  size_t total_len = type_info.GetElementCount();
+  std::string data_type = "none";
+
+  switch (element_type) {
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:  // maps to c type float
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<float>(), total_len * sizeof(float));
+      data_type = "fp32";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8:  // maps to c type uint8_t
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<uint8_t>(), total_len * sizeof(uint8_t));
+      data_type = "uint8_t";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8:  // maps to c type int8_t
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<int8_t>(), total_len * sizeof(int8_t));
+      data_type = "int8_t";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16:  // maps to c type uint16_t
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16: // for fp16, data must be stored as uint16 type to prevent errors with conformance script
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<uint16_t>(), total_len * sizeof(uint16_t));
+      data_type = "uint16_t";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16:  // maps to c type int16_t
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<int16_t>(), total_len * sizeof(int16_t));
+      data_type = "int16_t";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32:  // maps to c type int32_t
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<int32_t>(), total_len * sizeof(int32_t));
+      data_type = "int32_t";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:  // maps to c type int64_t
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<int64_t>(), total_len * sizeof(int64_t));
+      data_type = "int64_t";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL:
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<bool>(), total_len * sizeof(bool));
+      data_type = "bool";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE:  // maps to c type double
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<double>(), total_len * sizeof(double));
+      data_type = "double";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32:  // maps to c type uint32_t
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<uint32_t>(), total_len * sizeof(uint32_t));
+      data_type = "uint32_t";
+      break;
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64:  // maps to c type uint64_t
+      test_pb.set_raw_data(output_tensor->GetTensorMutableData<uint64_t>(), total_len * sizeof(uint64_t));
+      data_type = "uint64_t";
+      break;
+    default:
+      ORT_NOT_IMPLEMENTED("unexpected input data type");
+  }
+
+  // dump output values to .pb file
+  std::string pb_file_name = ".\\";
+  pb_file_name.append(output_file);
+  int protobuf_block_size_in_bytes = 4 * 1024 * 1024;
+  int tensor_fd;
+  auto st = Env::Default().FileOpenWr(pb_file_name, tensor_fd);
+  if (!st.IsOK()) {
+    ORT_THROW("File to write '", ToUTF8String(pb_file_name), "' failed:", st.ErrorMessage());
+  }
+  google::protobuf::io::FileOutputStream f(tensor_fd, protobuf_block_size_in_bytes);
+  f.SetCloseOnDelete(true);
+  if (!test_pb.SerializeToZeroCopyStream(&f)) {
+    ORT_THROW("parse file '", ToUTF8String(pb_file_name), "' failed");
+  }
+
+  //output to stdout
+  const char* outf = output_file.c_str();
+  const char* dt = data_type.c_str();
+  fprintf(stdout, "\nOutput values dumped to %s\n", outf);
+  fprintf(stdout, "\nData type: %s\n", dt);
+}
 
 RunTiming OnnxRuntimeTestSession::Run() {
   // Randomly pick one OrtValueArray from test_inputs_. (NOT ThreadSafe)

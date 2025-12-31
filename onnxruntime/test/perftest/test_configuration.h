@@ -67,6 +67,9 @@ struct RunConfig {
   bool disable_spinning_between_run = false;
   bool exit_after_session_creation = false;
   std::basic_string<ORTCHAR_T> register_custom_op_path;
+  // dump output conformance related
+  bool dump_output_conformance {false};
+  std::string output_file_name = "output_values.pb";
   bool enable_cuda_io_binding{false};
   bool use_extensions = false;
   bool compile_ep_context{false};

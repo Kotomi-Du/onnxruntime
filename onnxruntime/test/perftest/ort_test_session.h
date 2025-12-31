@@ -36,6 +36,8 @@ class OnnxRuntimeTestSession : public TestSession {
 
   RunTiming Run() override;
 
+  void RunDumpToNumpy(std::string output_file);
+
   ORT_DISALLOW_COPY_ASSIGNMENT_AND_MOVE(OnnxRuntimeTestSession);
 
  private:

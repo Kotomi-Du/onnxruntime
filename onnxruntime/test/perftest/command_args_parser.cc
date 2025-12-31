@@ -38,6 +38,8 @@ ABSL_FLAG(std::string, F, "",
           "Specifies a free dimension by denotation to override to a specific value for performance optimization.\n"
           "[Usage]: -f \"dimension_denotation1:override_value1\" -f \"dimension_denotation2:override_value2\" ...  or"
           " -f \"dimension_denotation1:override_value1 dimension_denotation2 : override_value2... \". Override value must > 0.");
+ABSL_FLAG(bool, N, DefaultPerformanceTestConfig().run_config.dump_output_conformance, "Dump output results to .pb format file.");
+ABSL_FLAG(std::string, m, "output_values.pb", ".pb file name to dump output results.");
 ABSL_FLAG(std::string, m, "duration", "Specifies the test mode. Value could be 'duration' or 'times'.");
 ABSL_FLAG(std::string, e, "cpu", "Specifies the provider 'cpu','cuda','dnnl','tensorrt', 'nvtensorrtrtx', 'openvino', 'dml', 'acl', 'nnapi', 'coreml', 'qnn', 'snpe', 'rocm', 'migraphx', 'xnnpack', 'vitisai' or 'webgpu'.");
 ABSL_FLAG(size_t, r, DefaultPerformanceTestConfig().run_config.repeated_times, "Specifies the repeated times if running in 'times' test mode.");
@@ -262,6 +264,12 @@ bool CommandLineParser::ParseArguments(PerformanceTestConfig& test_config, int a
 
   // -A
   test_config.run_config.enable_cpu_mem_arena = absl::GetFlag(FLAGS_A);
+
+  // -N
+  test_config.run_config.dump_output_conformance = absl::GetFlag(FLAGS_N);
+
+  // -O
+  test_config.run_config.output_file_name = absl::GetFlag(FLAGS_O);
 
   // -e
   {

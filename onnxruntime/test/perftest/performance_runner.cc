@@ -121,6 +121,12 @@ Status PerformanceRunner::Run() {
     return ORT_MAKE_STATUS(ONNXRUNTIME, FAIL, "failed to initialize.");
   }
 
+
+  // MLMetric added
+  // Dump output to .pb file
+  if (performance_test_config_.run_config.dump_output_conformance)
+    session_->RunDumpToNumpy(performance_test_config_.run_config.output_file_name);
+
   // warm up
   initial_inference_result_.start = std::chrono::high_resolution_clock::now();
   ORT_RETURN_IF_ERROR(RunOneIteration<true>());

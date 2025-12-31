@@ -24,6 +24,9 @@ class TestSession {
   virtual void PreLoadTestData(size_t test_data_id, size_t input_id, Ort::Value&& value) = 0;
 
   virtual ~TestSession() = default;
+
+  // MLMetric added
+  virtual void RunDumpToNumpy(std::string output_file) = 0;
 };
 }  // namespace perftest
 }  // namespace onnxruntime
