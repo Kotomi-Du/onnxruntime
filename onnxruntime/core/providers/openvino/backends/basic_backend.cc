@@ -383,7 +383,7 @@ struct ProfilingLogger {
     fs << "name, status, type, realTime, cpuTime, exec\n";
   }
   void Log(const OVInferRequestPtr& infer_request_) {
-    auto performanceMap = infer_request_->GetNewObj().get_profiling_info();
+    auto performanceMap = infer_request_->GetInfReq().get_profiling_info();
     for (const auto& it : performanceMap) {
       fs << std::quoted(it.node_name) << ",";
       switch (it.status) {
